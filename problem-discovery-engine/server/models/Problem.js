@@ -5,7 +5,7 @@ const problemSchema = new mongoose.Schema({
   clusters: [
     {
       title: String,
-      frequency: Number,
+      frequency: String,
       severity: Number,
       summary: String,
       solution: String,
