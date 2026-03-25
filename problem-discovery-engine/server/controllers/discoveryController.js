@@ -41,3 +41,21 @@ export const handleDiscovery = async (req, res) => {
     res.status(500).json({ error: 'Failed to process discovery engine' });
   }
 };
+
+export const handleDeepDive = async (req, res) => {
+  const { cluster } = req.body;
+  
+  if (!cluster || !cluster.title) {
+    return res.status(400).json({ error: 'Cluster data is required' });
+  }
+
+  try {
+    const deepDive = await aiService.generateDeepDive(cluster);
+    if (!deepDive) return res.status(500).json({ error: 'AI failed to generate deep dive' });
+    
+    res.json(deepDive);
+  } catch (error) {
+    console.error('Deep Dive Error:', error);
+    res.status(500).json({ error: 'Failed to generate deep dive analysis' });
+  }
+};

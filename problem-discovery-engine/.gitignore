@@ -23,3 +23,6 @@ yarn-error.log*
 # Git diagnostic files
 list-models.js
 temp_list_models.js
+
+# Roadmap
+feature_suggestions.md

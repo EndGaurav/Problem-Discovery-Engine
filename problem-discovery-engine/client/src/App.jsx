@@ -3,11 +3,31 @@ import { Search, Info, TrendingUp, AlertCircle, Zap, ExternalLink, RefreshCw, Ba
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import AuthModal from './components/AuthModal';
+import ProjectModal from './components/ProjectModal';
+import DeepDiveModal from './components/DeepDiveModal';
+import { Star, Folder, Plus, Trash2, ChevronRight, Bookmark, Rocket } from 'lucide-react';
 
 const API_BASE = '/api';
 
-const ProblemCard = ({ cluster, index }) => {
+const formatNumber = (num) => {
+  if (!num) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
   const [expanded, setExpanded] = useState(false);
+
+  const handleSaveClick = (e) => {
+    e.stopPropagation();
+    onSave(cluster);
+  };
+
+  const handleDeepDiveClick = (e) => {
+    e.stopPropagation();
+    onDeepDive(cluster);
+  };
 
   return (
     <motion.div
@@ -26,16 +46,23 @@ const ProblemCard = ({ cluster, index }) => {
             {cluster.title}
           </h3>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="px-2 py-1 md:px-3 md:py-1 bg-white/5 border border-white/10 rounded-full text-[10px] md:text-xs font-semibold text-slate-400">
-            {cluster.frequency} mentions
-          </span>
-          <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-1 bg-red-500/10 border border-red-500/20 rounded-full">
-            <AlertCircle size={10} className="md:size-[12px] text-red-400" />
-            <span className="text-[10px] md:text-xs font-bold text-red-400">Severity: {cluster.severity}/10</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button 
+              onClick={handleSaveClick}
+              className="p-2 glass rounded-full hover:bg-white/10 transition-colors text-amber-400 border-amber-400/20"
+              title="Save to Project"
+            >
+              <Star size={18} fill={cluster.isSaved ? "currentColor" : "none"} />
+            </button>
+            <span className="px-2 py-1 md:px-3 md:py-1 bg-white/5 border border-white/10 rounded-full text-[10px] md:text-xs font-semibold text-slate-400">
+              {formatNumber(cluster.frequency)} mentions
+            </span>
+            <div className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-1 bg-red-500/10 border border-red-500/20 rounded-full">
+              <AlertCircle size={10} className="md:size-[12px] text-red-400" />
+              <span className="text-[10px] md:text-xs font-bold text-red-400">Severity: {cluster.severity}/10</span>
+            </div>
           </div>
         </div>
-      </div>
 
       <p className="text-slate-400 mb-4 md:mb-6 text-sm md:text-base line-clamp-2 leading-relaxed">
         {cluster.summary}
@@ -67,6 +94,14 @@ const ProblemCard = ({ cluster, index }) => {
                 ))}
               </div>
             </div>
+
+            <button 
+              onClick={handleDeepDiveClick}
+              className="w-full py-3 bg-purple-600/20 border border-purple-500/30 rounded-xl flex items-center justify-center gap-2 text-purple-300 font-bold hover:bg-purple-600/30 transition-all group"
+            >
+              <Rocket size={16} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              AI Deep Dive Analysis
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -84,18 +119,53 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  // Projects state
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [clusterToSave, setClusterToSave] = useState(null);
+  const [activeTab, setActiveTab] = useState('discovery'); // discovery, projects
+  const [projects, setProjects] = useState([]);
+
+  // Deep Dive state
+  const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false);
+  const [deepDiveData, setDeepDiveData] = useState(null);
+  const [deepDiveTarget, setDeepDiveTarget] = useState(null);
+  const [deepDiveLoading, setDeepDiveLoading] = useState(false);
+
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
+      fetchProjects();
     }
   }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE}/projects`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProjects(response.data);
+    } catch (err) {
+      console.error("Failed to fetch projects");
+    }
+  };
 
   const handleAuthSuccess = (data) => {
     setUser(data.user);
     localStorage.setItem('user', JSON.stringify(data.user));
     localStorage.setItem('token', data.token);
+    fetchProjects();
   };
+
+  useEffect(() => {
+    if (clusters.length > 0 && projects.length > 0) {
+      setClusters(prev => prev.map(c => ({
+        ...c,
+        isSaved: projects.some(p => p.clusters.some(pc => pc.title === c.title))
+      })));
+    }
+  }, [projects]);
 
   const logout = () => {
     setUser(null);
@@ -127,6 +197,35 @@ export default function App() {
     }
   };
 
+  const handleSaveToProjectPrompt = (cluster) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setClusterToSave(cluster);
+    setIsProjectModalOpen(true);
+  };
+
+  const handleDeepDive = async (cluster) => {
+    setDeepDiveTarget(cluster);
+    setDeepDiveData(null);
+    setIsDeepDiveOpen(true);
+    setDeepDiveLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_BASE}/deep-dive`, 
+        { cluster },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setDeepDiveData(response.data);
+    } catch (err) {
+      console.error("Deep dive failed", err);
+    } finally {
+      setDeepDiveLoading(false);
+    }
+  };
+
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!keyword) return;
@@ -150,7 +249,13 @@ export default function App() {
         { keyword },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setClusters(response.data.clusters);
+      
+      const markedClusters = response.data.clusters.map(c => ({
+        ...c,
+        isSaved: projects.some(p => p.clusters.some(pc => pc.title === c.title))
+      }));
+      
+      setClusters(markedClusters);
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || "Failed to discover problems. Make sure the backend is running.");
@@ -167,6 +272,17 @@ export default function App() {
            {/* Logo placeholder if needed */}
         </div>
         <div className="pointer-events-auto flex items-center gap-4">
+          {user && (
+            <button 
+              onClick={() => {
+                setClusterToSave(null);
+                setIsProjectModalOpen(true);
+              }}
+              className="px-4 md:px-6 py-2 glass rounded-full text-xs md:text-sm font-bold bg-white/5 hover:bg-white/10 transition-all active:scale-95 flex items-center gap-2 text-purple-300 border-purple-500/20"
+            >
+              <Folder size={16} /> <span className="hidden sm:inline">My Projects</span>
+            </button>
+          )}
           {user ? (
             <div className="flex items-center gap-3 glass pl-2 pr-4 py-2 rounded-full border-white/10">
               <div className="relative group/avatar cursor-pointer">
@@ -295,7 +411,13 @@ export default function App() {
           {clusters.length > 0 && (
             <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {clusters.map((cluster, i) => (
-                <ProblemCard key={i} cluster={cluster} index={i} />
+                <ProblemCard 
+                  key={i} 
+                  cluster={cluster} 
+                  index={i} 
+                  onSave={handleSaveToProjectPrompt}
+                  onDeepDive={handleDeepDive}
+                />
               ))}
             </motion.div>
           )}
@@ -319,6 +441,27 @@ export default function App() {
             isOpen={isAuthModalOpen} 
             onClose={() => setIsAuthModalOpen(false)} 
             onAuthSuccess={handleAuthSuccess}
+          />
+        )}
+        {isProjectModalOpen && (
+          <ProjectModal 
+            isOpen={isProjectModalOpen}
+            onClose={() => setIsProjectModalOpen(false)}
+            clusterToSave={clusterToSave}
+            onSaveSuccess={() => {
+              setIsProjectModalOpen(false);
+              setClusterToSave(null);
+              fetchProjects();
+            }}
+          />
+        )}
+        {isDeepDiveOpen && (
+          <DeepDiveModal 
+            isOpen={isDeepDiveOpen}
+            onClose={() => setIsDeepDiveOpen(false)}
+            cluster={deepDiveTarget}
+            data={deepDiveData}
+            loading={deepDiveLoading}
           />
         )}
       </AnimatePresence>

@@ -1,11 +1,12 @@
 import express from 'express';
-import { handleDiscovery } from '../controllers/discoveryController.js';
+import { handleDiscovery, handleDeepDive } from '../controllers/discoveryController.js';
 import Problem from '../models/Problem.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.post('/discover', protect, handleDiscovery);
+router.post('/deep-dive', protect, handleDeepDive);
 
 // Fetch saved histories
 router.get('/history', protect, async (req, res) => {
