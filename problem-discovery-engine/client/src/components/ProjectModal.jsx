@@ -39,7 +39,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
         setSelectedProject(response.data.find(p => p._id === selectedProject._id));
       }
     } catch (err) {
-      setError("Failed to load projects");
+      setError("Failed to load folders");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
       setNewProjectName('');
       setView('list');
     } catch (err) {
-      setError("Failed to create project");
+      setError("Failed to create folder");
     } finally {
       setLoading(false);
     }
@@ -92,7 +92,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
       });
       setProjects(projects.filter(p => p._id !== projectId));
     } catch (err) {
-      setError("Failed to delete project");
+      setError("Failed to delete folder");
     }
   };
 
@@ -141,7 +141,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
              )}
              <h2 className="text-xl font-bold flex items-center gap-2">
               <Folder size={20} className="text-purple-400" />
-              {view === 'clusters' ? selectedProject?.name : (clusterToSave ? 'Save to Project' : 'Your Projects')}
+              {view === 'clusters' ? selectedProject?.name : (clusterToSave ? 'Save to Folder' : 'Your Folders')}
             </h2>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
@@ -166,7 +166,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
                   <div className="p-2 bg-purple-500/20 rounded-lg group-hover:bg-purple-500/30 transition-colors">
                     <Plus size={18} className="text-purple-400" />
                   </div>
-                  <span className="font-bold text-slate-300">Create New Project</span>
+                  <span className="font-bold text-slate-300">Create New Folder</span>
                 </div>
                 <ChevronRight size={18} className="text-slate-600" />
               </button>
@@ -208,7 +208,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
                 ))}
                 
                 {projects.length === 0 && !loading && (
-                  <p className="text-center py-10 text-slate-500 italic">No projects yet. Create one to get started.</p>
+                  <p className="text-center py-10 text-slate-500 italic">No folders yet. Create one to get started.</p>
                 )}
                 
                 {loading && (
@@ -225,7 +225,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
               <input 
                 autoFocus
                 type="text"
-                placeholder="Project Name (e.g. AI SaaS Ideas)"
+                placeholder="Folder Name (e.g. AI SaaS Ideas)"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 className="w-full h-14 glass rounded-2xl px-6 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
@@ -240,9 +240,9 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
                 </button>
                 <button 
                   disabled={loading || !newProjectName.trim()}
-                  className="flex-[2] h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  className="flex-[2] h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
                 >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : 'Create Project'}
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : 'Create Folder'}
                 </button>
               </div>
             </form>
@@ -279,7 +279,7 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
                 </div>
               ))}
               {selectedProject.clusters.length === 0 && (
-                <p className="text-center py-10 text-slate-500 italic">This project is empty.</p>
+                <p className="text-center py-10 text-slate-500 italic">This folder is empty.</p>
               )}
             </div>
           )}
