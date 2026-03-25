@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Camera, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
@@ -19,8 +19,29 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
 
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleOtpChange = (value, index) => {
+    if (isNaN(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+
+    // Auto focus next
+    if (value && index < 5) {
+      otpRefs[index + 1].current.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpRefs[index - 1].current.focus();
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -33,9 +54,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       let endpoint = '';
       if (mode === 'login') endpoint = '/login';
       else if (mode === 'register') endpoint = '/register';
-      else if (mode === 'verify') endpoint = '/verify-otp';
       else if (mode === 'forgot') endpoint = '/forgot-password';
       else if (mode === 'reset') endpoint = '/reset-password';
+
+      if (mode === 'verify') {
+        const fullOtp = otp.join('');
+        const response = await axios.post(`${API_BASE}/verify-otp`, { ...formData, otp: fullOtp });
+        onAuthSuccess(response.data);
+        onClose();
+        return;
+      }
 
       const response = await axios.post(`${API_BASE}${endpoint}`, formData);
       
@@ -157,17 +185,19 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
             )}
 
             {mode === 'verify' && (
-              <div className="relative group">
-                <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-purple-400 transition-colors" size={20} />
-                <input
-                  type="text"
-                  name="otp"
-                  required
-                  placeholder="Enter 6-digit OTP"
-                  value={formData.otp}
-                  onChange={handleChange}
-                  className="w-full h-12 glass rounded-2xl pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                />
+              <div className="flex justify-center gap-3 py-4">
+                {otp.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={otpRefs[index]}
+                    type="text"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(e.target.value, index)}
+                    onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                    className="w-12 h-14 glass rounded-xl text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all border border-white/10"
+                  />
+                ))}
               </div>
             )}
 

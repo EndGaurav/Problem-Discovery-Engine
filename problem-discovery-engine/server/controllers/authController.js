@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 };
 
 const sendEmail = async (options) => {
@@ -72,12 +72,17 @@ export const register = async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        profilePicture: user.profilePicture, // Added profilePicture to response
         isVerified: user.isVerified
       }
     });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    let message = error.message;
+    if (error.name === 'ValidationError') {
+      message = Object.values(error.errors).map(val => val.message)[0];
+    }
+    res.status(400).json({ message });
   }
 };
 
@@ -186,6 +191,39 @@ export const resetPassword = async (req, res) => {
 
     res.json({ message: 'Password reset successful!' });
 
+  } catch (error) {
+    let message = error.message;
+    if (error.name === 'ValidationError') {
+      message = Object.values(error.errors).map(val => val.message)[0];
+    }
+    res.status(400).json({ message });
+  }
+};
+
+export const updateProfilePicture = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Set URL of uploaded file
+    const fileUrl = `/uploads/${req.file.filename}`;
+    user.profilePicture = fileUrl;
+    await user.save();
+
+    res.json({
+      message: 'Profile picture updated successfully',
+      profilePicture: fileUrl,
+      user: {
+        ...user.toObject(),
+        profilePicture: fileUrl
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

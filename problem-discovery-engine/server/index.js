@@ -22,8 +22,10 @@ if (process.env.MONGODB_URI) {
     .catch(err => console.error('❌ MongoDB Connection Error:', err));
 }
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', authRoutes);

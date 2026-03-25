@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Info, TrendingUp, AlertCircle, Zap, ExternalLink, RefreshCw, BarChart2, User as UserIcon, LogOut, ShieldCheck } from 'lucide-react';
+import { Search, Info, TrendingUp, AlertCircle, Zap, ExternalLink, RefreshCw, BarChart2, User as UserIcon, LogOut, ShieldCheck, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import AuthModal from './components/AuthModal';
@@ -103,6 +103,30 @@ export default function App() {
     localStorage.removeItem('token');
   };
 
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.patch(`${API_BASE}/auth/update-avatar`, formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      const updatedUser = { ...user, profilePicture: response.data.profilePicture };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to upload avatar");
+    }
+  };
+
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!keyword) return;
@@ -145,11 +169,27 @@ export default function App() {
         <div className="pointer-events-auto flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-3 glass pl-2 pr-4 py-2 rounded-full border-white/10">
-              <img 
-                src={user.profilePicture} 
-                alt={user.username} 
-                className="w-8 h-8 rounded-full border-2 border-purple-500/50 object-cover" 
-              />
+              <div className="relative group/avatar cursor-pointer">
+                <img 
+                  src={user.profilePicture} 
+                  alt={user.username} 
+                  className="w-8 h-8 rounded-full border-2 border-purple-500/50 object-cover group-hover/avatar:opacity-50 transition-all shadow-inner" 
+                />
+                <button 
+                  onClick={() => document.getElementById('avatar-input').click()}
+                  className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity bg-black/40 rounded-full"
+                  title="Change Avatar"
+                >
+                  <Camera size={12} className="text-white" />
+                </button>
+                <input 
+                  id="avatar-input"
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleAvatarChange} 
+                  className="hidden" 
+                />
+              </div>
               <div className="hidden sm:block">
                 <p className="text-xs font-bold leading-none flex items-center gap-1">
                   {user.username}
