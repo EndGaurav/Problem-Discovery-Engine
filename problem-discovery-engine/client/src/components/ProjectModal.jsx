@@ -12,7 +12,7 @@ const formatNumber = (num) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
-export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuccess }) {
+export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuccess, onOpenCluster }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -251,20 +251,30 @@ export default function ProjectModal({ isOpen, onClose, clusterToSave, onSaveSuc
           {view === 'clusters' && selectedProject && (
             <div className="space-y-4">
               {selectedProject.clusters.map(c => (
-                <div key={c._id} className="p-4 glass rounded-2xl border-white/5 space-y-3 relative group/card">
+                <div 
+                  key={c._id} 
+                  onClick={() => onOpenCluster(c)}
+                  className="p-4 glass rounded-2xl border-white/5 space-y-3 relative group/card cursor-pointer hover:bg-white/10 transition-all border border-transparent hover:border-purple-500/20"
+                >
                   <div className="flex justify-between items-start pr-8">
-                    <h3 className="font-bold text-slate-100">{c.title}</h3>
+                    <h3 className="font-bold text-slate-100 group-hover/card:text-purple-400 transition-colors leading-tight">{c.title}</h3>
                     <button 
-                      onClick={() => handleRemoveCluster(selectedProject._id, c._id)}
-                      className="absolute top-4 right-4 p-2 hover:bg-red-500/10 rounded-lg text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover/card:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveCluster(selectedProject._id, c._id);
+                      }}
+                      className="absolute top-4 right-4 p-2 hover:bg-red-500/10 rounded-lg text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover/card:opacity-100 z-10"
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
-                  <p className="text-sm text-slate-400 line-clamp-2">{c.summary}</p>
-                  <div className="flex gap-2">
-                    <span className="px-2 py-0.5 bg-red-500/10 rounded-full text-[10px] text-red-300">Severity: {c.severity}/10</span>
-                    <span className="px-2 py-0.5 bg-indigo-500/10 rounded-full text-[10px] text-indigo-300">{formatNumber(c.frequency)} mentions</span>
+                  <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{c.summary}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex gap-2">
+                      <span className="px-2 py-0.5 bg-red-500/10 rounded-full text-[10px] text-red-300 font-bold border border-red-500/10">Severity: {c.severity}/10</span>
+                      <span className="px-2 py-0.5 bg-indigo-500/10 rounded-full text-[10px] text-indigo-300 font-bold border border-indigo-500/10 underline decoration-indigo-500/30">{formatNumber(c.frequency)} mentions</span>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-600 group-hover/card:translate-x-1 transition-transform" />
                   </div>
                 </div>
               ))}

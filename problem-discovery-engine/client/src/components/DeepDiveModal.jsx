@@ -5,19 +5,53 @@ export default function DeepDiveModal({ isOpen, onClose, data, cluster, loading 
   if (!isOpen) return null;
 
   const renderContent = (val) => {
-    if (typeof val === 'string') return val;
     if (!val) return 'No data available.';
-    return JSON.stringify(val, null, 2);
+    if (typeof val === 'string') return val;
+    
+    if (Array.isArray(val)) {
+      return (
+        <ul className="space-y-2">
+          {val.map((item, i) => (
+            <li key={i} className="flex gap-2 items-start">
+              <span className="text-purple-400 mt-1.5">•</span>
+              <span>{renderContent(item)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    if (typeof val === 'object') {
+      return (
+        <div className="space-y-3">
+          {Object.entries(val).map(([k, v]) => (
+            <div key={k} className="group/item">
+              <span className="text-[10px] font-black uppercase text-slate-500 tracking-tighter block mb-1 group-hover/item:text-purple-400 transition-colors">
+                {k.replace(/([A-Z])/g, ' $1').trim()}
+              </span>
+              <div className="text-slate-300 text-sm leading-relaxed">
+                {renderContent(v)}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    return String(val);
   };
 
   const renderList = (val) => {
-    if (typeof val === 'string') {
-      return val.split('\n').filter(s => s.trim());
-    }
+    if (!val) return [];
     if (Array.isArray(val)) return val;
-    if (val && typeof val === 'object') {
-       return Object.entries(val).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+    if (typeof val === 'object') {
+      return Object.entries(val).map(([k, v]) => {
+        if (typeof v === 'string') return `${k}: ${v}`;
+        if (typeof v === 'object') return `${k}: ${JSON.stringify(v)}`;
+        return `${k}: ${v}`;
+      });
     }
+    if (typeof val === 'string') return val.split('\n').filter(s => s.trim());
     return [];
   };
 
@@ -61,10 +95,10 @@ export default function DeepDiveModal({ isOpen, onClose, data, cluster, loading 
                   <Target size={24} />
                   <h3 className="text-lg font-bold">Market Opportunity</h3>
                 </div>
-                <div className="p-5 glass rounded-2xl bg-purple-500/5 border-purple-500/10">
-                  <p className="text-slate-300 leading-relaxed text-sm whitespace-pre-wrap">
+                <div className="p-5 glass rounded-2xl bg-purple-500/5 border-purple-500/10 min-h-[120px]">
+                  <div className="text-slate-300 leading-relaxed text-sm">
                     {renderContent(data.marketOpportunity)}
-                  </p>
+                  </div>
                 </div>
               </section>
 
@@ -74,10 +108,10 @@ export default function DeepDiveModal({ isOpen, onClose, data, cluster, loading 
                   <Users size={24} />
                   <h3 className="text-lg font-bold">Competitor Analysis</h3>
                 </div>
-                <div className="p-5 glass rounded-2xl bg-red-500/5 border-red-500/10">
-                  <p className="text-slate-300 leading-relaxed text-sm whitespace-pre-wrap">
+                <div className="p-5 glass rounded-2xl bg-red-500/5 border-red-500/10 min-h-[120px]">
+                  <div className="text-slate-300 leading-relaxed text-sm">
                     {renderContent(data.competitorAnalysis)}
-                  </p>
+                  </div>
                 </div>
               </section>
 
@@ -103,11 +137,11 @@ export default function DeepDiveModal({ isOpen, onClose, data, cluster, loading 
                   <ShieldAlert size={24} />
                   <h3 className="text-lg font-bold">Feasibility & Roadblocks</h3>
                 </div>
-                <div className="p-5 glass rounded-2xl bg-emerald-500/5 border-emerald-500/10 flex items-center gap-6">
-                  <Rocket className="text-emerald-500/20 shrink-0 hidden sm:block" size={48} />
-                  <p className="text-slate-300 leading-relaxed text-sm whitespace-pre-wrap">
+                <div className="p-6 glass rounded-2xl bg-emerald-500/5 border-emerald-500/10 flex items-start gap-6">
+                  <Rocket className="text-emerald-500/20 shrink-0 hidden sm:block mt-1" size={48} />
+                  <div className="text-slate-300 leading-relaxed text-sm flex-1">
                     {renderContent(data.technicalFeasibility)}
-                  </p>
+                  </div>
                 </div>
               </section>
             </div>

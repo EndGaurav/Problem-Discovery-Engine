@@ -3,24 +3,32 @@ import * as aiService from '../services/aiService.js';
 import Problem from '../models/Problem.js';
 
 export const handleDiscovery = async (req, res) => {
-  const { keyword } = req.body;
+  const { keyword, sources } = req.body;
   
   if (!keyword) {
     return res.status(400).json({ error: 'Keyword is required' });
   }
 
   try {
-    console.log(`Searching for problems related to: ${keyword}`);
+    const selectedSources = sources || ['Reddit'];
+    console.log(`Searching for problems in [${selectedSources.join(', ')}] related to: ${keyword}`);
     
-    // 1. Scrape Reddit
-    const rawData = await scraperService.scrapeReddit(keyword);
+    // Concurrently fetch only from selected sources
+    const fetchingPromises = [];
+    if (selectedSources.includes('Reddit')) fetchingPromises.push(scraperService.scrapeReddit(keyword));
+    if (selectedSources.includes('Hacker News')) fetchingPromises.push(scraperService.scrapeHackerNews(keyword));
+    if (selectedSources.includes('X')) fetchingPromises.push(scraperService.scrapeX(keyword));
+    if (selectedSources.includes('Product Hunt')) fetchingPromises.push(scraperService.scrapeProductHunt(keyword));
+    
+    const results = await Promise.all(fetchingPromises);
+    const rawData = results.flat();
     
     if (rawData.length === 0) {
       return res.json({ clusters: [], message: 'No significant problems found.' });
     }
 
     // 2. AI Clustering
-    const clusters = await aiService.processProblems(rawData);
+    const clusters = await aiService.processProblems(rawData, selectedSources);
 
     // 3. Persist to MongoDB (if connected)
     try {

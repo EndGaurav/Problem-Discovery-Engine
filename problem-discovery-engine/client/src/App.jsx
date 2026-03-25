@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Search, Info, TrendingUp, AlertCircle, Zap, ExternalLink, RefreshCw, BarChart2, User as UserIcon, LogOut, ShieldCheck, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Rocket, Zap, TrendingUp, RefreshCw, AlertCircle, TrendingDown, Star, Camera, Folder, X, ChevronRight, LogOut, Loader2, ShieldCheck, User as UserIcon, BarChart2 } from 'lucide-react';
 import axios from 'axios';
-import AuthModal from './components/AuthModal';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout, setCredentials, updateUser, openAuthModal, closeAuthModal } from './store/slices/authSlice';
+import { setKeyword, toggleSource, setDiscoveryStart, setDiscoverySuccess, setDiscoveryFailure, updateClusters } from './store/slices/discoverySlice';
+import { setProjects, openProjectModal, closeProjectModal } from './store/slices/projectSlice';
+import { openDeepDiveModal, closeDeepDiveModal, setDeepDiveData, setDeepDiveTarget, setDeepDiveLoading } from './store/slices/deepDiveSlice';
 import ProjectModal from './components/ProjectModal';
+import AuthModal from './components/AuthModal';
 import DeepDiveModal from './components/DeepDiveModal';
-import { Star, Folder, Plus, Trash2, ChevronRight, Bookmark, Rocket } from 'lucide-react';
 
 const API_BASE = '/api';
+
+const ALL_SOURCES = ['Reddit', 'Hacker News', 'X', 'Product Hunt'];
 
 const formatNumber = (num) => {
   if (!num) return '0';
@@ -18,6 +24,18 @@ const formatNumber = (num) => {
 
 const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
   const [expanded, setExpanded] = useState(false);
+
+  const safeStr = (val) => {
+    if (typeof val === 'string') return val;
+    if (!val) return '';
+    return JSON.stringify(val);
+  };
+
+  const safeTags = (val) => {
+    if (typeof val === 'string') return val.split(',').map(s => s.trim());
+    if (Array.isArray(val)) return val;
+    return [];
+  };
 
   const handleSaveClick = (e) => {
     e.stopPropagation();
@@ -43,7 +61,7 @@ const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
             <TrendingUp size={20} className="text-purple-400" />
           </div>
           <h3 className="text-lg md:text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent leading-tight">
-            {cluster.title}
+            {safeStr(cluster.title)}
           </h3>
         </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -65,7 +83,7 @@ const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
         </div>
 
       <p className="text-slate-400 mb-4 md:mb-6 text-sm md:text-base line-clamp-2 leading-relaxed">
-        {cluster.summary}
+        {safeStr(cluster.summary)}
       </p>
 
       <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 border-t border-white/5 pt-4">
@@ -73,7 +91,7 @@ const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
           <Zap size={14} className="text-amber-400 fill-amber-400 shrink-0" />
           <span className="font-semibold text-amber-100 whitespace-nowrap">AI Solution:</span>
         </div>
-        <span className="text-slate-400 text-sm md:text-base line-clamp-1 italic">{cluster.solution}</span>
+        <span className="text-slate-400 text-sm md:text-base line-clamp-1 italic">{safeStr(cluster.solution)}</span>
       </div>
 
       <AnimatePresence>
@@ -87,7 +105,7 @@ const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
             <div>
               <h4 className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Technical Path</h4>
               <div className="flex flex-wrap gap-2">
-                {cluster.techStack?.split(',').map((tech, i) => (
+                {safeTags(cluster.techStack).map((tech, i) => (
                   <span key={i} className="px-2 py-1 md:px-3 md:py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-xs text-indigo-300 font-medium">
                     {tech.trim()}
                   </span>
@@ -110,67 +128,54 @@ const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
 };
 
 export default function App() {
-  const [keyword, setKeyword] = useState('');
-  const [clusters, setClusters] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const dispatch = useDispatch();
   
-  // Auth state
-  const [user, setUser] = useState(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-  // Projects state
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [clusterToSave, setClusterToSave] = useState(null);
-  const [activeTab, setActiveTab] = useState('discovery'); // discovery, projects
-  const [projects, setProjects] = useState([]);
-
-  // Deep Dive state
-  const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false);
-  const [deepDiveData, setDeepDiveData] = useState(null);
-  const [deepDiveTarget, setDeepDiveTarget] = useState(null);
-  const [deepDiveLoading, setDeepDiveLoading] = useState(false);
+  // Redux State
+  const { user, token, isAuthModalOpen } = useSelector(state => state.auth);
+  const { keyword, clusters, loading, error, selectedSources } = useSelector(state => state.discovery);
+  const { projects, isModalOpen: isProjectModalOpen, clusterToSave } = useSelector(state => state.projects);
+  const { isModalOpen: isDeepDiveOpen, data: deepDiveData, target: deepDiveTarget, loading: deepDiveLoading } = useSelector(state => state.deepDive);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      fetchProjects();
+    if (user) {
+      fetchUserProjects();
     }
-  }, []);
+  }, [user, token]); // Added token to dependency array
 
-  const fetchProjects = async () => {
+  const fetchUserProjects = async () => {
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.get(`${API_BASE}/projects`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token || localStorage.getItem('token')}` }
       });
-      setProjects(response.data);
+      dispatch(setProjects(response.data));
     } catch (err) {
       console.error("Failed to fetch projects");
     }
   };
 
   const handleAuthSuccess = (data) => {
-    setUser(data.user);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    localStorage.setItem('token', data.token);
-    fetchProjects();
+    dispatch(setCredentials(data));
+    // Auth modal close is handled by the auth slice or the modal itself
+    fetchUserProjects();
   };
 
   useEffect(() => {
-    if (clusters.length > 0 && projects.length > 0) {
-      setClusters(prev => prev.map(c => ({
+    if (clusters.length > 0) {
+      const marked = clusters.map(c => ({
         ...c,
-        isSaved: projects.some(p => p.clusters.some(pc => pc.title === c.title))
-      })));
+        isSaved: projects.some(p => (p.clusters || []).some(pc => pc.title === c.title))
+      }));
+      
+      // Only dispatch if the saved status actually changed to prevent loops
+      const hasChanged = JSON.stringify(marked) !== JSON.stringify(clusters);
+      if (hasChanged) {
+        dispatch(updateClusters(marked));
+      }
     }
   }, [projects]);
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+  const handleLogout = () => {
+    dispatch(logout());
   };
 
   const handleAvatarChange = async (e) => {
@@ -181,72 +186,66 @@ export default function App() {
     formData.append('avatar', file);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.patch(`${API_BASE}/auth/update-avatar`, formData, {
-        headers: { 
+      const response = await axios.put(`${API_BASE}/auth/profile-picture`, formData, {
+        headers: {
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         }
       });
-      
-      const updatedUser = { ...user, profilePicture: response.data.profilePicture };
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      dispatch(updateUser({ profilePicture: response.data.profilePicture }));
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to upload avatar");
+      console.error("Failed to update avatar");
+      // Optionally dispatch an error to a global error state or display a toast
     }
   };
 
   const handleSaveToProjectPrompt = (cluster) => {
     if (!user) {
-      setIsAuthModalOpen(true);
+      dispatch(openAuthModal());
       return;
     }
-    setClusterToSave(cluster);
-    setIsProjectModalOpen(true);
+    dispatch(openProjectModal(cluster));
   };
 
   const handleDeepDive = async (cluster) => {
-    setDeepDiveTarget(cluster);
-    setDeepDiveData(null);
-    setIsDeepDiveOpen(true);
-    setDeepDiveLoading(true);
+    dispatch(setDeepDiveTarget(cluster));
+    dispatch(setDeepDiveData(null));
+    dispatch(openDeepDiveModal());
+    dispatch(setDeepDiveLoading(true));
 
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.post(`${API_BASE}/deep-dive`, 
         { cluster },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setDeepDiveData(response.data);
+      dispatch(setDeepDiveData(response.data));
     } catch (err) {
       console.error("Deep dive failed", err);
+      // Optionally dispatch an error to a global error state
     } finally {
-      setDeepDiveLoading(false);
+      dispatch(setDeepDiveLoading(false));
     }
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const handleDiscovery = async (e) => {
+    if (e) e.preventDefault();
     if (!keyword) return;
 
     if (!user) {
-      setIsAuthModalOpen(true);
+      dispatch(openAuthModal());
       return;
     }
 
     if (!user.isVerified) {
-      setError("Please verify your email to discover new problems.");
-      setIsAuthModalOpen(true);
+      dispatch(setDiscoveryFailure("Please verify your email to discover new problems.")); // Using discovery error for this
+      dispatch(openAuthModal()); // Open auth modal to prompt verification
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    dispatch(setDiscoveryStart());
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.post(`${API_BASE}/discover`, 
-        { keyword },
+        { keyword, sources: selectedSources },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -255,80 +254,80 @@ export default function App() {
         isSaved: projects.some(p => p.clusters.some(pc => pc.title === c.title))
       }));
       
-      setClusters(markedClusters);
+      dispatch(setDiscoverySuccess(markedClusters));
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || "Failed to discover problems. Make sure the backend is running.");
-    } finally {
-      setLoading(false);
+      dispatch(setDiscoveryFailure(err.response?.data?.message || "Failed to discover problems. Make sure the backend is running."));
     }
   };
 
   return (
     <div className="min-h-screen bg-background text-white selection:bg-purple-500">
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 w-full z-40 px-6 py-4 flex justify-between items-center pointer-events-none">
-        <div className="pointer-events-auto">
-           {/* Logo placeholder if needed */}
-        </div>
-        <div className="pointer-events-auto flex items-center gap-4">
-          {user && (
-            <button 
-              onClick={() => {
-                setClusterToSave(null);
-                setIsProjectModalOpen(true);
-              }}
-              className="px-4 md:px-6 py-2 glass rounded-full text-xs md:text-sm font-bold bg-white/5 hover:bg-white/10 transition-all active:scale-95 flex items-center gap-2 text-purple-300 border-purple-500/20"
-            >
-              <Folder size={16} /> <span className="hidden sm:inline">My Projects</span>
-            </button>
-          )}
-          {user ? (
-            <div className="flex items-center gap-3 glass pl-2 pr-4 py-2 rounded-full border-white/10">
-              <div className="relative group/avatar cursor-pointer">
-                <img 
-                  src={user.profilePicture} 
-                  alt={user.username} 
-                  className="w-8 h-8 rounded-full border-2 border-purple-500/50 object-cover group-hover/avatar:opacity-50 transition-all shadow-inner" 
-                />
-                <button 
-                  onClick={() => document.getElementById('avatar-input').click()}
-                  className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity bg-black/40 rounded-full"
-                  title="Change Avatar"
-                >
-                  <Camera size={12} className="text-white" />
-                </button>
-                <input 
-                  id="avatar-input"
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleAvatarChange} 
-                  className="hidden" 
-                />
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-xs font-bold leading-none flex items-center gap-1">
-                  {user.username}
-                  {user.isVerified && <ShieldCheck size={12} className="text-sky-400" />}
-                </p>
-                <p className="text-[10px] text-slate-400">{user.email}</p>
-              </div>
+      <nav className="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-4 backdrop-blur-xl bg-black/40 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <Rocket className="text-white" size={20} />
+             </div>
+             <span className="font-black text-xl tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Discovery Engine</span>
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-4">
+            {user && (
               <button 
-                onClick={logout}
-                className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                title="Logout"
+                onClick={() => dispatch(openProjectModal())}
+                className="px-4 md:px-6 py-2.5 glass rounded-full text-xs md:text-sm font-bold bg-white/5 hover:bg-white/10 transition-all active:scale-95 flex items-center gap-2 text-purple-300 border border-purple-500/30 shadow-lg shadow-purple-500/5 group"
               >
-                <LogOut size={16} />
+                <Folder size={16} className="group-hover:scale-110 transition-transform" /> 
+                <span className="hidden sm:inline">Bookmarks</span>
               </button>
-            </div>
-          ) : (
+            )}
+            {user ? (
+              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md pl-2 pr-4 py-1.5 rounded-full border border-white/20 shadow-inner group/profile">
+                <div className="relative group/avatar cursor-pointer">
+                  <img 
+                    src={user.profilePicture} 
+                    alt={user.username} 
+                    className="w-9 h-9 rounded-full border-2 border-purple-500/50 object-cover group-hover/avatar:opacity-50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.3)]" 
+                  />
+                  <button 
+                    onClick={() => document.getElementById('avatar-input').click()}
+                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity bg-black/60 rounded-full"
+                    title="Change Avatar"
+                  >
+                    <Camera size={14} className="text-white" />
+                  </button>
+                  <input 
+                    type="file" 
+                    id="avatar-input" 
+                    hidden 
+                    onChange={handleAvatarChange} 
+                    accept="image/*"
+                  />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[13px] font-black tracking-tight text-white leading-none">{user.username}</p>
+                    {user.isVerified && <ShieldCheck size={12} className="text-sky-400" />}
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="text-[9px] text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors font-bold uppercase mt-0.5"
+                  >
+                    <LogOut size={9} /> Logout
+                  </button>
+                </div>
+              </div>
+            ) : (
             <button
-              onClick={() => setIsAuthModalOpen(true)}
+              onClick={() => dispatch(openAuthModal())}
               className="px-6 py-2 glass rounded-full text-sm font-bold bg-white/5 hover:bg-white/10 transition-all active:scale-95 flex items-center gap-2"
             >
               <UserIcon size={16} /> Login
             </button>
           )}
+          </div>
         </div>
       </nav>
 
@@ -365,33 +364,60 @@ export default function App() {
 
         {/* Search Bar */}
         <section className="mb-12 md:mb-20">
-          <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto group px-2">
-            <input
-              type="text"
+          <form onSubmit={handleDiscovery} className="relative max-w-2xl mx-auto group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-purple-400 group-hover:scale-110 transition-transform" />
+            <input 
+              type="text" 
+              placeholder="Domain (e.g. Fintech, Edtech, SaaS)" 
+              className="w-full h-16 md:h-20 glass rounded-full pl-16 pr-32 md:pr-40 focus:outline-none focus:ring-4 focus:ring-purple-500/20 text-md md:text-lg font-medium transition-all"
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder={user ? "Enter a keyword..." : "Login to start discovering..."}
-              className="w-full h-14 md:h-16 glass rounded-2xl pl-12 md:pl-16 pr-20 md:pr-32 text-sm md:text-lg focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all group-hover:bg-white/10"
+              onChange={(e) => dispatch(setKeyword(e.target.value))}
             />
-            <Search className="absolute left-6 md:left-10 top-1/2 -translate-y-1/2 text-slate-500 size-5 md:size-6" />
-            <button
+            <button 
               disabled={loading}
-              className="absolute right-4 md:right-5 top-2 md:top-3 h-10 md:h-10 px-4 md:px-6 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all active:scale-95 text-xs md:text-base shadow-lg shadow-purple-500/20"
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-10 md:h-14 px-6 md:px-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full font-black text-xs md:text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? <RefreshCw size={14} className="animate-spin md:size-[18px]" /> : 'Discover'}
             </button>
           </form>
+
+          {/* Sources Selector */}
+          <div className="flex flex-col items-center gap-2 mt-8">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Research Sources</span>
+            <div className="flex flex-wrap justify-center gap-2 p-1 bg-black/20 backdrop-blur-md rounded-2xl border border-white/5 shadow-inner">
+              {ALL_SOURCES.map(source => {
+                const isActive = selectedSources.includes(source);
+                return (
+                  <button
+                    key={source}
+                    onClick={() => dispatch(toggleSource(source))}
+                    className={`px-5 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center gap-2 ${
+                      isActive 
+                        ? 'bg-purple-600/10 text-white border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.1)]' 
+                        : 'text-slate-500 hover:text-slate-300 border border-transparent'
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-purple-400 animate-pulse' : 'bg-slate-700'}`} />
+                    {source}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           
-          <div className="flex justify-center gap-2 md:gap-4 mt-6 md:mt-8 flex-wrap px-4">
-            {['SaaS', 'Test Flakiness', 'Crypto UX', 'Fitness Apps'].map(tag => (
-              <button
-                key={tag}
-                onClick={() => setKeyword(tag)}
-                className="px-3 py-1 md:px-4 md:py-1.5 glass rounded-full text-[10px] md:text-sm text-slate-400 hover:bg-white/10 border-white/5 transition-all active:scale-95"
-              >
-                {tag}
-              </button>
-            ))}
+          <div className="flex flex-col items-center mt-6 md:mt-8">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">Suggested Topics</span>
+            <div className="flex justify-center gap-2 md:gap-4 flex-wrap px-4">
+              {['SaaS', 'Test Flakiness', 'Crypto UX', 'Fitness Apps'].map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => dispatch(setKeyword(tag))}
+                  className="px-3 py-1 md:px-4 md:py-1.5 glass rounded-full text-[10px] md:text-sm text-slate-400 hover:bg-white/10 border-white/5 transition-all active:scale-95"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -439,26 +465,26 @@ export default function App() {
         {isAuthModalOpen && (
           <AuthModal 
             isOpen={isAuthModalOpen} 
-            onClose={() => setIsAuthModalOpen(false)} 
+            onClose={() => dispatch(closeAuthModal())} 
             onAuthSuccess={handleAuthSuccess}
           />
         )}
         {isProjectModalOpen && (
           <ProjectModal 
             isOpen={isProjectModalOpen}
-            onClose={() => setIsProjectModalOpen(false)}
+            onClose={() => dispatch(closeProjectModal())}
             clusterToSave={clusterToSave}
+            onOpenCluster={handleDeepDive}
             onSaveSuccess={() => {
-              setIsProjectModalOpen(false);
-              setClusterToSave(null);
-              fetchProjects();
+              dispatch(closeProjectModal());
+              fetchUserProjects();
             }}
           />
         )}
         {isDeepDiveOpen && (
           <DeepDiveModal 
             isOpen={isDeepDiveOpen}
-            onClose={() => setIsDeepDiveOpen(false)}
+            onClose={() => dispatch(closeDeepDiveModal())}
             cluster={deepDiveTarget}
             data={deepDiveData}
             loading={deepDiveLoading}
