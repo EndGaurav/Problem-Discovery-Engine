@@ -5,6 +5,7 @@ const initialState = {
   token: localStorage.getItem('token') || null,
   isAuthenticated: !!localStorage.getItem('token'),
   isAuthModalOpen: false,
+  authModalMode: 'login', // login, register, verify, forgot, reset
 };
 
 const authSlice = createSlice({
@@ -20,8 +21,9 @@ const authSlice = createSlice({
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('token', token);
     },
-    openAuthModal: (state) => {
+    openAuthModal: (state, action) => {
       state.isAuthModalOpen = true;
+      state.authModalMode = action.payload || 'login';
     },
     closeAuthModal: (state) => {
       state.isAuthModalOpen = false;

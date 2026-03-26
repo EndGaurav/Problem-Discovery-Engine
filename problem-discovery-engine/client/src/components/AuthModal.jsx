@@ -1,23 +1,37 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Camera, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import { useSelector } from 'react-redux';
 
 const API_BASE = '/api/auth';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
-  const [mode, setMode] = useState('login'); // login, register, verify, forgot, reset
+  const { authModalMode, user: loggedInUser } = useSelector(state => state.auth);
+  const [mode, setMode] = useState(authModalMode || 'login'); // login, register, verify, forgot, reset
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
+    email: loggedInUser?.email || '',
     password: '',
     otp: '',
     token: '',
-    profilePicture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop'
+    profilePicture: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    if (authModalMode) {
+      setMode(authModalMode);
+    }
+  }, [authModalMode]);
+
+  useEffect(() => {
+    if (loggedInUser?.email && !formData.email) {
+      setFormData(prev => ({ ...prev, email: loggedInUser.email }));
+    }
+  }, [loggedInUser, formData.email]);
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
@@ -34,13 +48,13 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
     // Auto focus next
     if (value && index < 5) {
-      otpRefs[index + 1].current.focus();
+      otpRefs[index + 1].current?.focus();
     }
   };
 
   const handleOtpKeyDown = (e, index) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs[index - 1].current.focus();
+      otpRefs[index - 1].current?.focus();
     }
   };
 
@@ -59,7 +73,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
       if (mode === 'verify') {
         const fullOtp = otp.join('');
-        const response = await axios.post(`${API_BASE}/verify-otp`, { ...formData, otp: fullOtp });
+        const response = await axios.post(`${API_BASE}/verify-otp`, { email: formData.email, otp: fullOtp });
         onAuthSuccess(response.data);
         onClose();
         return;
@@ -71,6 +85,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         onAuthSuccess(response.data);
         onClose();
       } else if (mode === 'register') {
+        // Automatically log the user in after registration
+        onAuthSuccess(response.data);
         setMode('verify');
         setMessage("Registration successful! Please enter the OTP sent to your email.");
       } else if (mode === 'forgot') {
@@ -198,6 +214,29 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
                     className="w-12 h-14 glass rounded-xl text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all border border-white/10"
                   />
                 ))}
+              </div>
+            )}
+
+            {mode === 'verify' && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      await axios.post(`${API_BASE}/resend-otp`, { email: formData.email });
+                      setMessage("A new OTP has been sent to your email.");
+                    } catch (err) {
+                      setError(err.response?.data?.message || "Failed to resend OTP");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="text-xs text-purple-400 hover:underline font-medium"
+                >
+                  Didn't get the code? Resend OTP
+                </button>
               </div>
             )}
 

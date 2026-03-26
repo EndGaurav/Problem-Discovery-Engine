@@ -129,7 +129,59 @@ export const verifyOTP = async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Email verified successfully!', token: generateToken(user._id) });
+    res.json({ 
+      message: 'Email verified successfully!', 
+      token: generateToken(user._id),
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        profilePicture: user.profilePicture,
+        isVerified: true
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: 'User is already verified' });
+    }
+
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    // Send OTP email
+    try {
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        await sendEmail({
+          email: user.email,
+          subject: 'Your new verification code - Problem Discovery Engine',
+          message: `Your new verification code is: ${otp}`,
+          html: `<h1>Verification Code</h1><p>Your new verification code is: <strong>${otp}</strong></p>`
+        });
+      }
+    } catch (err) {
+      console.error('Email sending failed:', err.message);
+    }
+
+    res.json({ message: 'New OTP sent to your email!' });
 
   } catch (error) {
     res.status(500).json({ message: error.message });

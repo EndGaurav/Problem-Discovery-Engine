@@ -1,13 +1,27 @@
 import { motion } from 'framer-motion';
-import { X, Target, Users, Map, ShieldAlert, Rocket, ChevronRight, Loader2 } from 'lucide-react';
+import { X, Target, Users, Map, ShieldAlert, Rocket, ChevronRight, Loader2, Cpu, ExternalLink } from 'lucide-react';
 
 export default function DeepDiveModal({ isOpen, onClose, data, cluster, loading }) {
   if (!isOpen) return null;
 
   const renderContent = (val) => {
     if (!val) return 'No data available.';
-    if (typeof val === 'string') return val;
-    
+    if (typeof val === 'string') {
+      // Basic markdown link renderer
+      const parts = val.split(/(\[.*?\]\(.*?\))/g);
+      return parts.map((part, i) => {
+        const match = part.match(/\[(.*?)\]\((.*?)\)/);
+        if (match) {
+          return (
+            <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-purple-400 font-bold hover:underline inline-flex items-center gap-1">
+              {match[1]} <ExternalLink size={12} />
+            </a>
+          );
+        }
+        return part;
+      });
+    }
+
     if (Array.isArray(val)) {
       return (
         <ul className="space-y-2">
@@ -131,8 +145,23 @@ export default function DeepDiveModal({ isOpen, onClose, data, cluster, loading 
                 </div>
               </section>
 
-              {/* Technical Feasibility */}
+              {/* Technical Blueprint */}
               <section className="col-span-1 md:col-span-2 space-y-4">
+                <div className="flex items-center gap-3 text-indigo-400">
+                  <Cpu size={24} />
+                  <h3 className="text-lg font-bold">Launch Blueprint</h3>
+                </div>
+                <div className="p-6 glass rounded-2xl bg-indigo-500/5 border-indigo-500/10">
+                   <div className="grid grid-cols-1 gap-6">
+                      <div className="text-slate-300 text-sm italic leading-relaxed">
+                        {renderContent(data.launchBlueprint)}
+                      </div>
+                   </div>
+                </div>
+              </section>
+
+              {/* Technical Feasibility */}
+              <section className="col-span-1 md:col-span-2 space-y-4 pb-8">
                 <div className="flex items-center gap-3 text-emerald-400">
                   <ShieldAlert size={24} />
                   <h3 className="text-lg font-bold">Feasibility & Roadblocks</h3>

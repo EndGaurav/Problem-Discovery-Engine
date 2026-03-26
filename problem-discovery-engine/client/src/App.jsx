@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Rocket, Zap, TrendingUp, RefreshCw, AlertCircle, TrendingDown, Star, Camera, Folder, X, ChevronRight, LogOut, Loader2, ShieldCheck, User as UserIcon, BarChart2 } from 'lucide-react';
+import { Search, Rocket, Zap, TrendingUp, RefreshCw, AlertCircle, TrendingDown, Star, Camera, Folder, X, ChevronRight, LogOut, Loader2, ShieldCheck, User as UserIcon, BarChart2, ChevronDown, Mail, Settings, LayoutGrid, PieChart, Activity, Info } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout, setCredentials, updateUser, openAuthModal, closeAuthModal } from './store/slices/authSlice';
@@ -127,6 +127,140 @@ const ProblemCard = ({ cluster, index, onSave, onDeepDive }) => {
   );
 };
 
+const UserAvatar = ({ user, className = "w-9 h-9", imageClassName = "", textClassName = "text-xs" }) => {
+  if (user?.profilePicture && user.profilePicture !== "") {
+    return (
+      <img 
+        src={user.profilePicture} 
+        alt={user.username} 
+        className={`${className} rounded-full border-2 border-purple-500/50 object-cover shadow-[0_0_10px_rgba(168,85,247,0.3)] ${imageClassName}`} 
+      />
+    );
+  }
+  
+  const initial = user?.username ? user.username.charAt(0).toUpperCase() : '?';
+  
+  return (
+    <div className={`${className} rounded-full border-2 border-purple-500/50 flex items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 shadow-[0_0_10px_rgba(168,85,247,0.3)] ${imageClassName}`}>
+       <span className={`text-white font-black ${textClassName}`}>{initial}</span>
+    </div>
+  );
+};
+
+const AnalysisDashboard = ({ clusters, onDeepDive }) => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Priority Matrix */}
+        <div className="lg:col-span-2 glass rounded-3xl p-8 border-white/10 relative overflow-hidden h-[500px] flex flex-col">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h3 className="text-xl font-black flex items-center gap-2">
+                <LayoutGrid className="text-purple-400" size={20} />
+                Problem Priority Matrix
+              </h3>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Severity vs Frequency</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+                <span className="text-[10px] font-bold text-slate-400">High Pain</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 relative border-l-2 border-b-2 border-white/10 ml-8 mb-8">
+            {/* Axis Labels */}
+            <div className="absolute -left-10 top-1/2 -rotate-90 text-[10px] font-black uppercase tracking-widest text-slate-600">Severity</div>
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-widest text-slate-600">Frequency (Mentions)</div>
+            
+            {/* Grid Helper Lines */}
+            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 pointer-events-none opacity-20">
+               {[...Array(16)].map((_, i) => <div key={i} className="border border-white/5" />)}
+            </div>
+
+            {/* Matrix Quads Hints */}
+            <div className="absolute top-0 right-0 p-4 text-red-500/20 font-black text-2xl select-none">CRITICAL</div>
+            <div className="absolute bottom-0 right-0 p-4 text-purple-500/20 font-black text-2xl select-none">OPPORTUNITY</div>
+
+            {/* Data Points */}
+            {clusters.map((cluster, i) => {
+              // Normalize for grid (assuming max freq ~100 as per AI prompt)
+              const x = (Math.min(cluster.frequency, 100) / 100) * 100;
+              const y = (cluster.severity / 10) * 100;
+              
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.1 + 0.5, type: 'spring' }}
+                  className="absolute cursor-pointer group/point"
+                  style={{ left: `${x}%`, bottom: `${y}%`, transform: 'translate(-50%, 50%)' }}
+                  onClick={() => onDeepDive(cluster)}
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 border-white shadow-2xl transition-all group-hover/point:scale-150 z-10 ${cluster.severity > 7 ? 'bg-red-500 shadow-red-500/50' : 'bg-purple-500 shadow-purple-500/50'}`} />
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-3 glass rounded-xl border-white/20 opacity-0 group-hover/point:opacity-100 transition-all pointer-events-none z-20 translate-y-2 group-hover/point:translate-y-0 shadow-2xl">
+                     <p className="text-xs font-black text-white mb-1 truncate">{cluster.title}</p>
+                     <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                        <span>Freq: {cluster.frequency}</span>
+                        <span>Sev: {cluster.severity}/10</span>
+                     </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Trend Summary */}
+        <div className="glass rounded-3xl p-8 border-white/10 flex flex-col h-[500px]">
+          <h3 className="text-xl font-black flex items-center gap-2 mb-8">
+            <Activity className="text-emerald-400" size={20} />
+            Market Pulse
+          </h3>
+          
+          <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            {clusters.map((cluster, i) => (
+              <div key={i} className="group/trend p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/15 transition-all cursor-pointer" onClick={() => onDeepDive(cluster)}>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="text-sm font-bold truncate max-w-[140px]">{cluster.title}</h4>
+                  <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    cluster.trend === 'Up' ? 'bg-emerald-500/20 text-emerald-400' : 
+                    cluster.trend === 'Down' ? 'bg-red-500/20 text-red-400' : 
+                    'bg-slate-500/20 text-slate-400'
+                  }`}>
+                    {cluster.trend === 'Up' ? <TrendingUp size={10} /> : cluster.trend === 'Down' ? <TrendingDown size={10} /> : <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />}
+                    {cluster.trend || 'Stable'}
+                  </div>
+                </div>
+                {/* Mini Graph Dummy */}
+                <div className="h-8 w-full flex items-end gap-1 px-1">
+                   {[...Array(8)].map((_, j) => {
+                     const height = cluster.trend === 'Up' ? 20 + (j * 10) : cluster.trend === 'Down' ? 90 - (j * 10) : 40 + Math.random() * 20;
+                     return <div key={j} className={`flex-1 rounded-sm opacity-30 transition-all group-hover/trend:opacity-100 ${cluster.trend === 'Up' ? 'bg-emerald-400' : 'bg-slate-400'}`} style={{ height: `${height}%` }} />;
+                   })}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-8 p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 flex gap-3 items-center">
+            <Info className="text-indigo-400 shrink-0" size={20} />
+            <p className="text-[11px] text-slate-400 leading-tight">Trends are inferred based on the sentiment and post timing from scraped content.</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function App() {
   const dispatch = useDispatch();
   
@@ -135,6 +269,22 @@ export default function App() {
   const { keyword, clusters, loading, error, selectedSources } = useSelector(state => state.discovery);
   const { projects, isModalOpen: isProjectModalOpen, clusterToSave } = useSelector(state => state.projects);
   const { isModalOpen: isDeepDiveOpen, data: deepDiveData, target: deepDiveTarget, loading: deepDiveLoading } = useSelector(state => state.deepDive);
+
+  // New State for View Toggle
+  const [view, setView] = useState('list'); // 'list' or 'analysis'
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -155,7 +305,8 @@ export default function App() {
 
   const handleAuthSuccess = (data) => {
     dispatch(setCredentials(data));
-    // Auth modal close is handled by the auth slice or the modal itself
+    // Clear any previous discovery errors (like verification required)
+    dispatch(setDiscoveryFailure(null));
     fetchUserProjects();
   };
 
@@ -237,8 +388,8 @@ export default function App() {
     }
 
     if (!user.isVerified) {
-      dispatch(setDiscoveryFailure("Please verify your email to discover new problems.")); // Using discovery error for this
-      dispatch(openAuthModal()); // Open auth modal to prompt verification
+      dispatch(setDiscoveryFailure("Please verify your email to discover new problems."));
+      dispatch(openAuthModal('verify')); // Open auth modal in verify mode
       return;
     }
 
@@ -284,40 +435,120 @@ export default function App() {
               </button>
             )}
             {user ? (
-              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md pl-2 pr-4 py-1.5 rounded-full border border-white/20 shadow-inner group/profile">
-                <div className="relative group/avatar cursor-pointer">
-                  <img 
-                    src={user.profilePicture} 
-                    alt={user.username} 
-                    className="w-9 h-9 rounded-full border-2 border-purple-500/50 object-cover group-hover/avatar:opacity-50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.3)]" 
-                  />
-                  <button 
-                    onClick={() => document.getElementById('avatar-input').click()}
-                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity bg-black/60 rounded-full"
-                    title="Change Avatar"
-                  >
-                    <Camera size={14} className="text-white" />
-                  </button>
-                  <input 
-                    type="file" 
-                    id="avatar-input" 
-                    hidden 
-                    onChange={handleAvatarChange} 
-                    accept="image/*"
-                  />
-                </div>
-                <div className="hidden sm:block">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-[13px] font-black tracking-tight text-white leading-none">{user.username}</p>
-                    {user.isVerified && <ShieldCheck size={12} className="text-sky-400" />}
+              <div ref={dropdownRef} className="relative">
+                {/* Navbar Profile Trigger Button */}
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className={`flex items-center gap-3 bg-white/5 backdrop-blur-md pl-2 pr-4 py-1.5 rounded-full border transition-all active:scale-95 group/profile ${isProfileOpen ? 'border-purple-500/50 bg-white/10 ring-4 ring-purple-500/10' : 'border-white/20 shadow-inner'}`}
+                >
+                  <div className="relative">
+                    <UserAvatar user={user} />
+                    {!user.isVerified && <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-500 border-2 border-background rounded-full animate-pulse" />}
                   </div>
-                  <button 
-                    onClick={handleLogout}
-                    className="text-[9px] text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors font-bold uppercase mt-0.5"
-                  >
-                    <LogOut size={9} /> Logout
-                  </button>
-                </div>
+                  <div className="hidden sm:block text-left">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <p className="text-[13px] font-black tracking-tight text-white leading-none">{user.username}</p>
+                      {user.isVerified && <ShieldCheck size={12} className="text-sky-400" />}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Account</p>
+                  </div>
+                  <ChevronDown size={14} className={`text-slate-500 transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Professional Profile Dropdown ("The Box") */}
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-4 w-72 glass rounded-3xl overflow-hidden shadow-2xl border border-white/15 z-[60] origin-top-right"
+                    >
+                      {/* Header Section */}
+                      <div className="p-6 bg-gradient-to-br from-purple-600/20 to-indigo-600/20 border-b border-white/10 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                           <Rocket size={80} className="-rotate-12" />
+                        </div>
+                        <div className="relative flex items-center gap-4">
+                           <div className="relative group/avatar cursor-pointer">
+                              <UserAvatar 
+                                user={user} 
+                                className="w-14 h-14" 
+                                imageClassName="shadow-xl group-hover:opacity-50 transition-all" 
+                                textClassName="text-xl"
+                              />
+                              <button 
+                                onClick={() => document.getElementById('avatar-input').click()}
+                                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-full"
+                                title="Change Profile Picture"
+                              >
+                                <Camera size={16} className="text-white" />
+                              </button>
+                              <input 
+                                type="file" 
+                                id="avatar-input" 
+                                hidden 
+                                onChange={handleAvatarChange} 
+                                accept="image/*"
+                              />
+                           </div>
+                           <div>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <h4 className="text-lg font-black text-white leading-none">{user.username}</h4>
+                                {user.isVerified && <ShieldCheck size={14} className="text-sky-400" />}
+                              </div>
+                              <p className="text-xs text-slate-400 font-medium truncate max-w-[140px] flex items-center gap-1">
+                                <Mail size={10} className="text-slate-500" /> {user.email}
+                              </p>
+                           </div>
+                        </div>
+                      </div>
+
+                      {/* Menu Section */}
+                      <div className="p-3">
+                        {!user.isVerified && (
+                          <button 
+                            onClick={() => {
+                              dispatch(openAuthModal('verify'));
+                              setIsProfileOpen(false);
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all group mb-2"
+                          >
+                            <div className="p-2 bg-amber-500/20 rounded-lg group-hover:scale-110 transition-transform">
+                              <ShieldCheck size={18} />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-black">Verify Account</p>
+                              <p className="text-[10px] opacity-70">Unlock full discovery access</p>
+                            </div>
+                          </button>
+                        )}
+
+                        <button 
+                          className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group"
+                        >
+                          <div className="p-2 bg-white/5 rounded-lg group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-all">
+                            <Settings size={18} />
+                          </div>
+                          <span className="text-sm font-bold">Account Settings</span>
+                          <div className="ml-auto px-1.5 py-0.5 bg-white/5 rounded text-[8px] font-black uppercase text-slate-500">Soon</div>
+                        </button>
+
+                        <div className="h-px bg-white/5 my-2 mx-2" />
+
+                        <button 
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-all group"
+                        >
+                          <div className="p-2 bg-white/5 group-hover:bg-red-500/20 transition-all rounded-lg">
+                            <LogOut size={18} />
+                          </div>
+                          <span className="text-sm font-bold">Sign Out</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ) : (
             <button
@@ -435,17 +666,41 @@ export default function App() {
           )}
 
           {clusters.length > 0 && (
-            <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              {clusters.map((cluster, i) => (
-                <ProblemCard 
-                  key={i} 
-                  cluster={cluster} 
-                  index={i} 
-                  onSave={handleSaveToProjectPrompt}
-                  onDeepDive={handleDeepDive}
-                />
-              ))}
-            </motion.div>
+            <div className="space-y-10">
+              {/* View Toggle */}
+              <div className="flex justify-center">
+                <div className="p-1.5 glass rounded-2xl flex gap-1 border-white/5 shadow-2xl">
+                   <button 
+                    onClick={() => setView('list')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${view === 'list' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+                   >
+                     <LayoutGrid size={16} /> Result Cards
+                   </button>
+                   <button 
+                    onClick={() => setView('analysis')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${view === 'analysis' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+                   >
+                     <PieChart size={16} /> Matrix Analysis
+                   </button>
+                </div>
+              </div>
+
+              {view === 'list' ? (
+                <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  {clusters.map((cluster, i) => (
+                    <ProblemCard 
+                      key={i} 
+                      cluster={cluster} 
+                      index={i} 
+                      onSave={handleSaveToProjectPrompt}
+                      onDeepDive={handleDeepDive}
+                    />
+                  ))}
+                </motion.div>
+              ) : (
+                <AnalysisDashboard clusters={clusters} onDeepDive={handleDeepDive} />
+              )}
+            </div>
           )}
 
           {loading && clusters.length === 0 && (

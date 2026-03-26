@@ -7,7 +7,8 @@ import {
   verifyOTP, 
   forgotPassword, 
   resetPassword,
-  updateProfilePicture
+  updateProfilePicture,
+  resendOTP
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -40,6 +41,7 @@ router.post('/login', login);
 router.post('/verify-otp', verifyOTP);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+router.post('/resend-otp', resendOTP);
 
 // Profile Routes
 router.patch('/update-avatar', protect, upload.single('avatar'), updateProfilePicture);

@@ -40,6 +40,7 @@ const callGroq = async (prompt, isArray = true) => {
         summary: flatten(c.summary),
         solution: flatten(c.solution),
         techStack: flatten(c.techStack),
+        trend: flatten(c.trend) || 'Stable',
         frequency: Number(c.frequency) || 1,
         severity: Number(c.severity) || 5
       }));
@@ -56,7 +57,7 @@ export const processProblems = async (rawData, selectedSources) => {
   const groqResult = await callGroq(`
     Analyze exactly ${rawData.length} items from ${selectedSources.join(', ')}. 
     Return a JSON object with a key 'clusters' containing an array of 5 objects.
-    Each object keys: title, frequency, severity, summary, solution, techStack.
+    Each object keys: title, frequency, severity, summary, solution, techStack, trend (string: 'Up', 'Down', or 'Stable').
     Data: ${JSON.stringify(rawData).substring(0, 15000)}
   `, true);
 
@@ -85,6 +86,7 @@ export const processProblems = async (rawData, selectedSources) => {
     - summary: (A brief description of the frustration)
     - solution: (A potential product idea)
     - techStack: (A comma-separated string)
+    - trend: (String: 'Up', 'Down', or 'Stable' based on the dates/frequency of sample data)
 
     Important: For the 'frequency', do not use arbitrary large numbers. Base it on the relative occurrence within the provided ${rawData.length} items of sample data.
 
@@ -143,7 +145,9 @@ export const generateDeepDive = async (cluster) => {
   const groqRes = await callGroq(`
     Deep Dive business/product analysis for: ${cluster.title}
     Details: ${cluster.summary}
-    Return JSON with fields: marketOpportunity, competitorAnalysis, mvpBlueprint, technicalFeasibility.
+    Return JSON with fields: marketOpportunity, competitorAnalysis, mvpBlueprint, technicalFeasibility, launchBlueprint.
+    The 'launchBlueprint' should recommend 3-4 specific modern tech tools (e.g. Stripe, Clerk, Supabase, Pinecone) that are EXACTLY tailored to this specific problem. DO NOT just repeat the examples. If it's a data problem, suggest Snowflake/Prisma; if it's a hardware problem, suggest Raspberry Pi/Arduino; if it's a mobile problem, suggest React Native/Expo.
+    Provide brief 1-sentence reasons and markdown links to their official docs.
   `, false);
   
   if (groqRes) return groqRes;
@@ -169,6 +173,7 @@ export const generateDeepDive = async (cluster) => {
     - competitorAnalysis: (String - A comprehensive paragraph of competitor breakdown. NO NESTED OBJECTS.)
     - mvpBlueprint: (String - A simple numbered list of 5 steps, e.g. "1. Step one\n2. Step two". NO NESTED OBJECTS.)
     - technicalFeasibility: (String - A comprehensive paragraph of technical roadblocks and solutions. NO NESTED OBJECTS.)
+    - launchBlueprint: (String - A comprehensive modern tech stack tailored specifically to this cluster, including specific tool names and documentation links. Do NOT use placeholder or generic examples unless they truly fit.)
 
     CRITICAL: All values MUST be simple text strings. Do NOT return arrays or nested objects.
   `;
